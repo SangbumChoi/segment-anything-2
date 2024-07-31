@@ -90,6 +90,9 @@ class SAM2ImagePredictor:
         input_image = self._transforms(image)
         input_image = input_image[None, ...].to(self.device)
 
+        # zinccat
+        torch.save(input_image, 'input_image.pt')
+
         assert (
             len(input_image.shape) == 4 and input_image.shape[1] == 3
         ), f"input_image must be of size 1x3xHxW, got {input_image.shape}"
@@ -105,6 +108,9 @@ class SAM2ImagePredictor:
             for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
         ][::-1]
         self._features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
+
+        torch.save(self._features, '_features.pt')
+
         self._is_image_set = True
         logging.info("Image embeddings computed.")
 
@@ -397,6 +403,16 @@ class SAM2ImagePredictor:
             feat_level[img_idx].unsqueeze(0)
             for feat_level in self._features["high_res_feats"]
         ]
+        # ruffy369
+        torch.save([
+            self._features["image_embed"][img_idx].unsqueeze(0), 
+            self.model.sam_prompt_encoder.get_dense_pe(),
+            sparse_embeddings,
+            dense_embeddings,
+            multimask_output,
+            batched_mode,
+            high_res_features
+            ], 'sam_mask_decoder_input.pt')
         low_res_masks, iou_predictions, _, _ = self.model.sam_mask_decoder(
             image_embeddings=self._features["image_embed"][img_idx].unsqueeze(0),
             image_pe=self.model.sam_prompt_encoder.get_dense_pe(),
@@ -406,6 +422,10 @@ class SAM2ImagePredictor:
             repeat_image=batched_mode,
             high_res_features=high_res_features,
         )
+        torch.save([
+            low_res_masks,
+            iou_predictions
+            ], 'sam_mask_decoder_outut.pt')
 
         # Upscale the masks to the original image resolution
         masks = self._transforms.postprocess_masks(
